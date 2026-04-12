@@ -1,9 +1,12 @@
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 import os
 
-# 1. Page Configuration
-st.set_page_config(page_title="Tayyab & Owais Chat", page_icon="💬")
 
+# 1. Page Configuration
+st.set_page_config(page_title="Professor ki chat", page_icon="💬")
+
+st_autorefresh(interval=2000, key="datarefresh")
 # 2. Database File Setup (Messages yahan save honge)
 DB_FILE = "chat_history.txt"
 
