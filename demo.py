@@ -32,7 +32,7 @@ def load_messages():
     return messages
 
 # 3. UI Shuru
-st.title("🚀 PROFESSOR Private Chat")
+st.title("🚀 Malik Rizwan ki wife ky sth Chat")
 
 # Sidebar for Name and Upload
 with st.sidebar:
