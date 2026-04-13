@@ -1,164 +1,81 @@
-import streamlit as st
+ import streamlit as st
+import os
+from PIL import Image
+from datetime import datetime
 
-import google.generativeai as genai
+# 1. Page Configuration
+st.set_page_config(page_title="Tayyab & Owais Chat", page_icon="💬")
 
-from PIL import Image  # Tasveer parhne ke liye zaroori hai
+# 2. Setup Directories and Files
+DB_FILE = "chat_history.txt"
+MEDIA_DIR = "chat_media"
 
+if not os.path.exists(MEDIA_DIR):
+    os.makedirs(MEDIA_DIR)
 
+def save_message(user, content, msg_type="text"):
+    with open(DB_FILE, "a", encoding="utf-8") as f:
+        # Format: User||Type||Content
+        f.write(f"{user}||{msg_type}||{content}\n")
 
-# --- 1. CONFIGURATION ---
+def load_messages():
+    if not os.path.exists(DB_FILE):
+        return []
+    messages = []
+    with open(DB_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if "||" in line:
+                parts = line.strip().split("||", 2)
+                if len(parts) == 3:
+                    user, msg_type, content = parts
+                    messages.append({"user": user, "type": msg_type, "content": content})
+    return messages
 
-GOOGLE_API_KEY = "AIzaSyDRLw82kbZmh5HdaXLKuo-UejHcngqWuRc"
+# 3. UI Shuru
+st.title("🚀 PROFESSOR Private Chat")
 
-genai.configure(api_key=GOOGLE_API_KEY)
-
-
-
-# --- 2. MODEL SELECTION ---
-
-@st.cache_resource
-
-def get_best_model():
-
-    try:
-
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-
-        if 'models/gemini-1.5-flash' in available_models:
-
-            return 'models/gemini-1.5-flash'
-
-        elif 'models/gemini-pro' in available_models:
-
-            return 'models/gemini-pro'
-
-        return available_models[0] if available_models else None
-
-    except:
-
-        return None
-
-
-
-best_model_name = get_best_model()
-
-
-
-# --- 3. PAGE UI ---
-
-st.set_page_config(page_title="GURU AI", page_icon="⭐")
-
-st.title("⭐ GURU AI")
-
-
-
-# --- 4. SIDEBAR (Image Upload Feature) ---
-
+# Sidebar for Name and Upload
 with st.sidebar:
-
-    st.header("GURU Settings")
-
+    st.header("User Profile")
+    my_name = st.text_input("Apna Naam Likhein:", value="Tayyab")
     
-
-    # Image Upload Option
-
-    uploaded_file = st.file_uploader("Koi photo upload karein (Optional)", type=['png', 'jpg', 'jpeg'])
-
+    st.divider()
+    st.header("Upload Media")
+    uploaded_file = st.file_uploader("Photo select karein", type=["jpg", "jpeg", "png"])
     
-
-    if uploaded_file:
-
-        st.image(uploaded_file, caption="Selected Image", use_container_width=True)
-
-    
-
-    if st.button("Clear Chat History"):
-
-        st.session_state.messages = []
-
+    if st.button("Send Photo") and uploaded_file:
+        # Save image file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        img_path = os.path.join(MEDIA_DIR, f"{timestamp}_{uploaded_file.name}")
+        with open(img_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        # Save reference in TXT
+        save_message(my_name, img_path, msg_type="image")
         st.rerun()
 
-    
+    if st.button("Delete All Chat"):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+        # Clear images folder too
+        for file in os.listdir(MEDIA_DIR):
+            os.remove(os.path.join(MEDIA_DIR, file))
+        st.rerun()
 
-    st.write("---")
+# 4. Display Messages
+all_messages = load_messages()
+for m in all_messages:
+    role = "user" if m["user"] == my_name else "assistant"
+    with st.chat_message(role):
+        st.write(f"**{m['user']}**")
+        if m["type"] == "text":
+            st.write(m["content"])
+        elif m["type"] == "image":
+            st.image(m["content"], use_container_width=True)
 
-    st.success("GURU is Online")
-
-
-
-# --- 5. CHAT MEMORY ---
-
-if "messages" not in st.session_state:
-
-    st.session_state.messages = []
-
-
-
-for message in st.session_state.messages:
-
-    name = "GURU" if message["role"] == "assistant" else "Tayyab"
-
-    with st.chat_message(message["role"]):
-
-        st.markdown(f"**{name}:** {message['content']}")
-
-
-
-# --- 6. CHAT LOGIC ---
-
-if prompt := st.chat_input("GURU se kuch puchiye..."):
-
-    
-
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.chat_message("user"):
-
-        st.markdown(f"**Tayyab:** {prompt}")
-
-
-
-    with st.chat_message("assistant"):
-
-        try:
-
-            model = genai.GenerativeModel(
-
-                model_name=best_model_name,
-
-                system_instruction="Aapka naam GURU hai. Aap ek aqalmand ustad hain.Hamesha 'Assalam-o-Alaikum' se baat shuru karein aur 'Namaste' hargiz na kahein. Kahein. Agar koi puche 'Who are you' to hamesha kahein 'Main GURU hoon Mujy Tayyab ny bnaya hai'."
-
-            )
+# 5. Chat Input (Text)
+if prompt := st.chat_input("Message likhein..."):
+    save_message(my_name, prompt, msg_type="text")
+    st.rerun()           
 
             
-
-            st.write("**GURU:**")
-
-            
-
-            # Agar image hai to image + text dono bhejain, warna sirf text
-
-            if uploaded_file:
-
-                img = Image.open(uploaded_file)
-
-                # Dono cheezein list mein jati hain
-
-                response = model.generate_content([prompt, img], stream=True)
-
-            else:
-
-                response = model.generate_content(prompt, stream=True)
-
-            
-
-            full_response = st.write_stream((chunk.text for chunk in response))
-
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-
-                    
-
-        except Exception as e:
-
-            st.error(f"GURU ko masla aya: {e}")
-
